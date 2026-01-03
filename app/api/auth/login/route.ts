@@ -1,41 +1,51 @@
-import { type NextRequest, NextResponse } from "next/server"
-import bcrypt from "bcryptjs"
-import { findUserByEmail } from "@/lib/db"
-import { createToken, setAuthCookie } from "@/lib/auth"
-import { initializeDatabase } from "@/lib/db"
+// app/api/auth/login/route.ts
+import { type NextRequest, NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
+import { findUserByEmail } from "@/lib/db";
+import { createToken } from "@/lib/auth";
+import type { User } from "@/lib/types";
+
+// Extend User to include password for login check
+type UserWithPassword = Omit<User, "createdAt"> & { password: string };
 
 export async function POST(request: NextRequest) {
   try {
-    await initializeDatabase()
-
-    const { email, password } = await request.json()
+    const { email, password } = await request.json();
 
     if (!email || !password) {
-      return NextResponse.json({ error: "Email and password are required" }, { status: 400 })
+      return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
     }
 
-    const user = await findUserByEmail(email)
+    const user = await findUserByEmail(email);
 
     if (!user) {
-      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
+      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
-    const isValidPassword = await bcrypt.compare(password, user.password)
+    const userWithPassword = user as UserWithPassword;
 
+    const isValidPassword = await bcrypt.compare(password, userWithPassword.password);
     if (!isValidPassword) {
-      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
+      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
-    const { password: _, ...userWithoutPassword } = user
-    const token = await createToken(userWithoutPassword)
-    await setAuthCookie(token)
+    const { password: _, ...userWithoutPassword } = userWithPassword as User;
 
-    return NextResponse.json({
-      user: userWithoutPassword,
-      token,
-    })
+    const token = await createToken(userWithoutPassword);
+
+    const response = NextResponse.json({ user: userWithoutPassword }); // ✅ Return user info
+
+    response.cookies.set("auth-token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: "/",
+    });
+
+    return response;
   } catch (error) {
-    console.error("[v0] Login error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("[auth] Login error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

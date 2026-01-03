@@ -82,11 +82,6 @@ else router.push("/employee");
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Signing in..." : "Sign In"}
           </Button>
-          <div className="text-sm text-muted-foreground space-y-1">
-            <p>Demo credentials:</p>
-            <p>Admin: admin@company.com / admin123</p>
-            <p>Employee: john.doe@company.com / emp123</p>
-          </div>
         </form>
       </CardContent>
     </Card>

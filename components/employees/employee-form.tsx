@@ -23,6 +23,7 @@ export function EmployeeForm({ employee, onSubmit, onCancel }: EmployeeFormProps
     position: employee?.position || "",
     salary: employee?.salary?.toString() || "",
     joiningDate: employee?.joiningDate || "",
+    status: employee?.status || "active" as const,
   })
 
   const [loading, setLoading] = useState(false)
@@ -31,7 +32,18 @@ export function EmployeeForm({ employee, onSubmit, onCancel }: EmployeeFormProps
     e.preventDefault()
     setLoading(true)
     try {
-      await onSubmit(formData)
+      await onSubmit({
+        employeeId: formData.employeeId,
+        name: formData.name,
+        email: formData.email,
+        department: formData.department,
+        position: formData.position,
+        salary: Number(formData.salary),
+        joiningDate: formData.joiningDate,
+        status: formData.status,
+      })
+    } catch (error) {
+      console.error("Form submission error:", error)
     } finally {
       setLoading(false)
     }

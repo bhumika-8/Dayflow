@@ -1,5 +1,5 @@
 export interface User {
-  id: string
+  id?: string
   email: string
   password: string
   name: string
@@ -14,7 +14,7 @@ export interface User {
 }
 
 export interface Employee {
-  id: string
+  id?: string
   employeeId: string
   name: string
   email: string
@@ -27,7 +27,7 @@ export interface Employee {
 }
 
 export interface AttendanceRecord {
-  id: string
+  id?: string
   employeeId: string
   date: string
   checkIn?: string
@@ -37,7 +37,7 @@ export interface AttendanceRecord {
 }
 
 export interface LeaveRequest {
-  id: string
+  id?: string
   employeeId: string
   employeeName: string
   leaveType: "sick" | "casual" | "annual" | "unpaid"
@@ -51,7 +51,7 @@ export interface LeaveRequest {
 }
 
 export interface PayrollRecord {
-  id: string
+  id?: string
   employeeId: string
   employeeName: string
   month: string

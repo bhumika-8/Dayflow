@@ -1,98 +1,109 @@
-import type { User, Employee, AttendanceRecord, LeaveRequest, PayrollRecord } from "./types"
-import bcrypt from "bcryptjs"
+import clientPromise from "./mongodb";
+import type { User, Employee, AttendanceRecord, LeaveRequest, PayrollRecord } from "./types";
+import { ObjectId, Document } from "mongodb";
 
-// In-memory database (replace with actual DB in production)
-export const db = {
-  users: [] as User[],
-  employees: [] as Employee[],
-  attendance: [] as AttendanceRecord[],
-  leaves: [] as LeaveRequest[],
-  payroll: [] as PayrollRecord[],
+const DB_NAME = "hrms_db";
+
+/* =========================
+   COLLECTION HELPER
+========================= */
+export async function getCollection<T extends Document>(collectionName: string) {
+  const client = await clientPromise;
+  const db = client.db(DB_NAME);
+  return db.collection<T>(collectionName);
 }
 
-// Initialize with demo data
-export async function initializeDatabase() {
-  if (db.users.length === 0) {
-    const hashedAdminPass = await bcrypt.hash("admin123", 10)
-    const hashedEmpPass = await bcrypt.hash("emp123", 10)
-
-    db.users.push(
-      {
-        id: "1",
-        email: "admin@company.com",
-        password: hashedAdminPass,
-        name: "Admin User",
-        role: "admin",
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: "2",
-        email: "john.doe@company.com",
-        password: hashedEmpPass,
-        name: "John Doe",
-        role: "employee",
-        employeeId: "EMP001",
-        department: "Engineering",
-        position: "Senior Developer",
-        salary: 80000,
-        joiningDate: "2023-01-15",
-        createdAt: new Date().toISOString(),
-      },
-    )
-
-    db.employees.push({
-      id: "2",
-      employeeId: "EMP001",
-      name: "John Doe",
-      email: "john.doe@company.com",
-      department: "Engineering",
-      position: "Senior Developer",
-      salary: 80000,
-      joiningDate: "2023-01-15",
-      status: "active",
-    })
-
-    // Sample attendance
-    const today = new Date()
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(today)
-      date.setDate(date.getDate() - i)
-      db.attendance.push({
-        id: `att-${i}`,
-        employeeId: "EMP001",
-        date: date.toISOString().split("T")[0],
-        checkIn: "09:00",
-        checkOut: "18:00",
-        status: "present",
-        workHours: 9,
-      })
-    }
-
-    // Sample leave requests
-    db.leaves.push({
-      id: "leave-1",
-      employeeId: "EMP001",
-      employeeName: "John Doe",
-      leaveType: "casual",
-      startDate: "2024-02-01",
-      endDate: "2024-02-03",
-      reason: "Personal work",
-      status: "pending",
-      appliedDate: new Date().toISOString(),
-    })
-  }
+/* =========================
+   HELPER TO MAP _id TO id
+========================= */
+function mapId<T extends { _id?: ObjectId }>(doc: T) {
+  if (!doc) return null;
+  const { _id, ...rest } = doc;
+  return { ...rest, id: _id?.toString() };
 }
 
+/* =========================
+   USER OPERATIONS
+========================= */
 export async function findUserByEmail(email: string) {
-  return db.users.find((u) => u.email === email)
+  const usersCol = await getCollection<User & Document>("users");
+  const user = await usersCol.findOne({ email });
+  return user ? mapId(user) : null;
 }
 
 export async function createUser(userData: Omit<User, "id" | "createdAt">) {
+  const usersCol = await getCollection<User & Document>("users");
   const user: User = {
     ...userData,
-    id: Date.now().toString(),
     createdAt: new Date().toISOString(),
-  }
-  db.users.push(user)
-  return user
+  };
+  const result = await usersCol.insertOne(user);
+  return { ...user, id: result.insertedId.toString() };
+}
+
+/* =========================
+   EMPLOYEE OPERATIONS
+========================= */
+export async function getEmployees() {
+  const col = await getCollection<Employee & Document>("employees");
+  const docs = await col.find().toArray();
+  return docs.map(mapId);
+}
+
+export async function createEmployee(employeeData: Omit<Employee, "id" | "status">) {
+  const col = await getCollection<Employee & Document>("employees");
+  const employee: Employee = {
+    ...employeeData,
+    status: "active",
+  };
+  const result = await col.insertOne(employee);
+  return { ...employee, id: result.insertedId.toString() };
+}
+
+/* =========================
+   ATTENDANCE OPERATIONS
+========================= */
+export async function getAttendance(employeeId?: string) {
+  const col = await getCollection<AttendanceRecord & Document>("attendance");
+  const query = employeeId ? { employeeId } : {};
+  const docs = await col.find(query).toArray();
+  return docs.map(mapId);
+}
+
+export async function createAttendance(record: Omit<AttendanceRecord, "id">) {
+  const col = await getCollection<AttendanceRecord & Document>("attendance");
+  const result = await col.insertOne(record);
+  return { ...record, id: result.insertedId.toString() };
+}
+
+/* =========================
+   LEAVE OPERATIONS
+========================= */
+export async function getLeaves(employeeId?: string) {
+  const col = await getCollection<LeaveRequest & Document>("leaves");
+  const query = employeeId ? { employeeId } : {};
+  const docs = await col.find(query).toArray();
+  return docs.map(mapId);
+}
+
+export async function createLeaveRequest(leave: Omit<LeaveRequest, "id">) {
+  const col = await getCollection<LeaveRequest & Document>("leaves");
+  const result = await col.insertOne(leave);
+  return { ...leave, id: result.insertedId.toString() };
+}
+
+/* =========================
+   PAYROLL OPERATIONS
+========================= */
+export async function getPayroll(employeeId?: string) {
+  const col = await getCollection<PayrollRecord & Document>("payroll");
+  const query = employeeId ? { employeeId } : {};
+  const docs = await col.find(query).toArray();
+  return docs.map(mapId);
+}
+
+export async function createPayrollRecord(record: Omit<PayrollRecord, "id">) {
+  const col = await getCollection<PayrollRecord & Document>("payroll");
+  const result = await col.insertOne(record);
+  return { ...record, id: result.insertedId.toString() };
 }
