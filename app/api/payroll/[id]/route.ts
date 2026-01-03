@@ -1,8 +1,19 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { getSession } from "@/lib/auth"
-import { db } from "@/lib/db"
+import { getCollection } from "@/lib/db"   // ✅ only import getCollection
+import { ObjectId, Document } from "mongodb"
 
-export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+// ✅ re‑declare mapId here since it's not exported from db.ts
+function mapId<T extends { _id?: ObjectId }>(doc: T) {
+  if (!doc) return null
+  const { _id, ...rest } = doc
+  return { ...rest, id: _id?.toString() }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
   const session = await getSession()
 
   if (!session || session.role !== "admin") {
@@ -10,22 +21,33 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   try {
-    const { id } = await params
+    const { id } = params
     const data = await request.json()
 
-    const payrollIndex = db.payroll.findIndex((p) => p.id === id)
+    const payrollCol = await getCollection<Document>("payroll")
 
-    if (payrollIndex === -1) {
+    const payrollRecord = await payrollCol.findOne({ _id: new ObjectId(id) })
+    if (!payrollRecord) {
       return NextResponse.json({ error: "Payroll record not found" }, { status: 404 })
     }
 
-    db.payroll[payrollIndex] = {
-      ...db.payroll[payrollIndex],
-      ...data,
-      paymentDate: data.status === "paid" ? new Date().toISOString() : db.payroll[payrollIndex].paymentDate,
+    const updatedData: Partial<Document> = { ...data }
+
+    if (data.status === "paid") {
+      updatedData.paymentDate = new Date().toISOString()
     }
 
-    return NextResponse.json({ payroll: db.payroll[payrollIndex] })
+    const result = await payrollCol.findOneAndUpdate(
+      { _id: new ObjectId(id) },
+      { $set: updatedData },
+      { returnDocument: "after" }
+    )
+
+    if (!result) {
+      return NextResponse.json({ error: "Failed to update payroll record" }, { status: 500 })
+    }
+
+    return NextResponse.json({ payroll: mapId(result) })
   } catch (error) {
     console.error("[v0] Update payroll error:", error)
     return NextResponse.json({ error: "Failed to update payroll record" }, { status: 500 })
