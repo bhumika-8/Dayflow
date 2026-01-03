@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic"
+
+
 import { cn } from "@/lib/utils"
 import { Users, Calendar, FileText, DollarSign } from "lucide-react"
 import { StatCard } from "@/components/dashboard/stat-card"
